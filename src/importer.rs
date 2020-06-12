@@ -15,25 +15,28 @@ pub struct CsvImporter {
 
 impl CsvImporter {
     pub fn from_file(
-        csv_file: &Path,
+        csv_file: impl AsRef<Path>,
         ledger_account_set: HashSet<String>,
     ) -> Result<Self, MvelopesError> {
-        let rules_file = Self::get_sibling_rules_path(csv_file);
+        let rules_file = Self::get_sibling_rules_path(&csv_file);
 
-        Self::from_file_with_rules(csv_file, &rules_file, ledger_account_set)
+        Self::from_file_with_rules(csv_file, rules_file, ledger_account_set)
     }
 
-    fn get_sibling_rules_path(original: &Path) -> PathBuf {
-        PathBuf::from(format!("{}.rules", original.display()))
+    fn get_sibling_rules_path(original: impl AsRef<Path>) -> PathBuf {
+        let mut os_string = original.as_ref().to_path_buf().into_os_string();
+        os_string.push(".rules");
+
+        PathBuf::from(os_string)
     }
 
     pub fn from_file_with_rules(
-        csv_file: &Path,
-        rules_file: &Path,
+        csv_file: impl AsRef<Path>,
+        rules_file: impl AsRef<Path>,
         ledger_account_set: HashSet<String>,
     ) -> Result<Self, MvelopesError> {
-        let csv_str = fs::read_to_string(csv_file).map_err(|e| MvelopesError::file_error(csv_file, e))?;
-        let rules_str = fs::read_to_string(rules_file).map_err(|e| MvelopesError::file_error(rules_file, e))?;
+        let csv_str = fs::read_to_string(&csv_file).map_err(|e| MvelopesError::file_error(&csv_file, e))?;
+        let rules_str = fs::read_to_string(&rules_file).map_err(|e| MvelopesError::file_error(&rules_file, e))?;
 
         Self::from_strs(&csv_str, &rules_str, ledger_account_set)
     }

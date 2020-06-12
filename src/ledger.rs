@@ -306,7 +306,7 @@ impl Ledger {
         self.append_entry(entry)
     }
 
-    pub fn import_csv(&mut self, csv_file: &Path, rules_file: Option<&PathBuf>) -> Result<(), MvelopesError> {
+    pub fn import_csv<P: AsRef<Path>>(&mut self, csv_file: P, rules_file: Option<P>) -> Result<(), MvelopesError> {
         let account_set = self.accounts.keys().cloned().collect();
 
         let imp = match rules_file {
@@ -339,3 +339,5 @@ impl Debug for Ledger {
         Ok(())
     }
 }
+
+// vim: foldmethod=syntax
