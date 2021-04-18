@@ -4,8 +4,6 @@ use crate::utils;
 use std::collections::HashSet;
 use std::fmt;
 
-pub mod parser;
-
 #[derive(Clone, Debug)]
 pub struct ClassicPosting {
     amount: Option<Amount>,
