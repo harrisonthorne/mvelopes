@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 // TODO auto-fixable errors?
 
+pub type SilverfoxResult<T> = Result<T, SilverfoxError>;
+
 /// SilverfoxError is an enum for all possible custom errors that silverfox can throw. It is a
 /// wrapper of sorts.
 #[derive(Debug)]
