@@ -8,7 +8,7 @@ use crate::{amount::Amount, errors::ParseError};
 
 use super::{is_amount_quantity_char, is_amount_symbol_char};
 
-pub fn parse_amount(input: &str, decimal_symbol: char) -> Result<(String, Amount), ParseError> {
+pub fn parse_amount(input: &str, decimal_symbol: char) -> IResult<&str, Amount, ParseError> {
     // reassign to remove double negatives
     let input = input.replace("--", "");
 
@@ -20,12 +20,12 @@ pub fn parse_amount(input: &str, decimal_symbol: char) -> Result<(String, Amount
 
     // using `preceded` in case the amount starts with whitespace
     let (leftover, (symbol_raw, quantity_raw)) =
-        preceded(space0, amount_parser)(&input).map_err(|_| ParseError {
+        preceded(space0, amount_parser)(&input).map_err(|e| e.map(|_| ParseError {
             context: Some(input.to_string()),
             message: Some(String::from("none of this could be parsed as an amount")),
-        })?;
+        }))?;
 
-    // replace `quantity_raw`; transform quantity string into a format that Rust can parse
+    // transform the quantity string into a format that Rust can parse. replace `quantity_raw`
     let quantity_raw = {
         // remove thousands separators
         let x: String = quantity_raw
@@ -42,7 +42,7 @@ pub fn parse_amount(input: &str, decimal_symbol: char) -> Result<(String, Amount
     };
 
     Ok((
-        leftover.to_owned(),
+        leftover,
         Amount {
             symbol: if symbol_raw.trim().is_empty() {
                 // symbol_raw shouldn't have spaces in it, but better safe than sorry
@@ -50,21 +50,23 @@ pub fn parse_amount(input: &str, decimal_symbol: char) -> Result<(String, Amount
             } else {
                 Some(symbol_raw.to_string())
             },
-            mag: quantity_raw.parse().map_err(|e| ParseError {
+            mag: quantity_raw.parse().map_err(|e| nom::Err::Error(ParseError {
                 context: Some(format!(r#""{}""#, input)),
                 message: Some(format!(
                     "couldn't parse this as a number\nmore info: {:#?}",
                     e
                 )),
-            })?,
+            }))?,
         },
     ))
 }
 
+/// Returns (symbol, number)
 fn symbol_then_number(input: &str) -> IResult<&str, (&str, &str)> {
     separated_pair(symbol_only, space0, number_only)(input)
 }
 
+/// Returns (number, symbol)
 fn number_then_symbol(input: &str) -> IResult<&str, (&str, &str)> {
     separated_pair(number_only, space0, symbol_only)(input)
 }
@@ -178,66 +180,66 @@ mod tests {
             assert_eq!(parse_amount(input, dec).unwrap(), expected);
         };
 
-        test("$100", '.', (String::new(), amount("$", 100.0)));
-        test("12.34 BTC", '.', (String::new(), amount("BTC", 12.34)));
-        test("56.78Y", '.', (String::new(), amount("Y", 56.78)));
-        test("pts 910.11", '.', (String::new(), amount("pts", 910.11)));
-        test("%20.", '.', (String::new(), amount("%", 20.0)));
-        test("$100.000,4", ',', (String::new(), amount("$", 100_000.4)));
-        test("$,6", ',', (String::new(), amount("$", 0.6)));
+        test("$100", '.', ("", amount("$", 100.0)));
+        test("12.34 BTC", '.', ("", amount("BTC", 12.34)));
+        test("56.78Y", '.', ("", amount("Y", 56.78)));
+        test("pts 910.11", '.', ("", amount("pts", 910.11)));
+        test("%20.", '.', ("", amount("%", 20.0)));
+        test("$100.000,4", ',', ("", amount("$", 100_000.4)));
+        test("$,6", ',', ("", amount("$", 0.6)));
         test(
             "$1_000_000.5",
             '.',
-            (String::new(), amount("$", 1_000_000.5)),
+            ("", amount("$", 1_000_000.5)),
         );
         test(
             "$1_000_000,123_456",
             ',',
-            (String::new(), amount("$", 1_000_000.123456)),
+            ("", amount("$", 1_000_000.123456)),
         );
 
         test(
             "$123 ; a wild comment appeared!",
             '.',
             (
-                " ; a wild comment appeared!".to_string(),
+                " ; a wild comment appeared!",
                 amount("$", 123.0),
             ),
         );
         test(
             "127h//yoink",
             '.',
-            ("//yoink".to_string(), amount("h", 127.0)),
+            ("//yoink", amount("h", 127.0)),
         );
 
-        test("$100 ex", '.', (String::from(" ex"), amount("$", 100.0)));
+        test("$100 ex", '.', (" ex", amount("$", 100.0)));
         test(
             "BTC100.oops",
             '.',
-            (String::from("oops"), amount("BTC", 100.0)),
+            ("oops", amount("BTC", 100.0)),
         );
         test(
             "500 ETH weiner",
             '.',
-            (String::from(" weiner"), amount("ETH", 500.0)),
+            (" weiner", amount("ETH", 500.0)),
         );
         test(
             "456.7 DOGE boye",
             '.',
-            (String::from(" boye"), amount("DOGE", 456.7)),
+            (" boye", amount("DOGE", 456.7)),
         );
         test(
             "891,1 commas extra",
             ',',
-            (String::from(" extra"), amount("commas", 891.1)),
+            (" extra", amount("commas", 891.1)),
         );
 
         // testing leading spaces
-        test(" 600spaces", '.', (String::new(), amount("spaces", 600.0)));
+        test(" 600spaces", '.', ("", amount("spaces", 600.0)));
         test(
             "\t2_000.watts",
             '.',
-            (String::new(), amount("watts", 2000.0)),
+            ("", amount("watts", 2000.0)),
         );
     }
 }

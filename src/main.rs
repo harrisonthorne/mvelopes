@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate nom;
-
 pub mod account;
 pub mod amount;
 pub mod entry;
