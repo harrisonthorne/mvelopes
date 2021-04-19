@@ -114,13 +114,15 @@ More specifically:
 brackets as above, can be queried by silverfox.
 
 > Note: While silverfox has formatting extremely similar to
-> hledger or ledger-cli, an silverfox file is not necessarily
+> hledger or ledger-cli, a silverfox file is not necessarily
 > compatible with an hledger or ledger-cli file. You'll
 > notice that (for example) an equal sign (=) in a posting
 > (an account-amount line in a transaction entry) has two
 > very different meanings between hledger and silverfox:
 > hledger uses it for balance assertions, and silverfox uses
 > it for cost assertions.
+>
+> Also note: There is a hope to change this incompatibility.
 
 ### Comments
 
@@ -129,11 +131,11 @@ or a double-slash (`//`).
 
 ```
 2019/08/02 ? Restaurant [Fancy's]
-    assets:checking     -140        // Not worth the price, by the way
-    expenses:dining      140
+    assets:checking     -140        // This is a comment
+    expenses:dining      140        ; This is also a comment
 ```
 
-> Note: double slashes are preferred. The `format`
+> Note: `silverfox` will prefer double slashes. The `format`
 > subcommand (coming soon!) will replace semicolons with
 > double slashes.
 
@@ -226,8 +228,8 @@ account assets:checking
                                                 // accounts aren't required
 ```
 
-> Note: the `funding` option is optional. If omitted, silverfox
-> won't move money automatically. 
+> Note: the `funding` option is optional. If omitted,
+> however, silverfox won't move money automatically. 
 
 If you want to delay the starting date for an envelope, you
 can do so with `starting`:
@@ -241,7 +243,7 @@ account assets:checking
 
 If you opt for the frequency of an envelope to be `every
 other` something, `starting` is required (so silverfox can
-know which weeks and months to use):
+know which weeks or months to use):
 
 ```
 account assets:checking
@@ -249,7 +251,6 @@ account assets:checking
         amount 100                                                  // for $100
         for expenses:home:electricity                               // automatically moves money when expenses:home:electricity is used
         funding conservative                                        // use conservative funding
-
 ```
 
 We can also do envelopes for goals:
@@ -268,7 +269,7 @@ account assets:savings
 Really, the `expense` and `goal` keywords are both
 interchangeable. They do the same thing. And, as mentioned,
 `due`, `by`, and even `due by` are the same. But not `by
-due`. That makes no sense. silverfox will throw an error.
+due`. That makes no sense.
 
 A couple of other points to note:
 
