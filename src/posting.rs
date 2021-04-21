@@ -35,23 +35,19 @@ impl EnvelopePosting {
     ) -> Result<Self, ParseError> {
         let mut tokens = line.split_whitespace().skip(1);
 
-        let account_name = if let Some(a) = tokens.next() {
-            String::from(a)
-        } else {
-            return Err(ParseError {
-                message: Some("probably missing an account name".to_string()),
-                context: Some(line.to_string()),
-            });
-        };
-
-        let envelope_name = if let Some(e) = tokens.next() {
-            String::from(e)
-        } else {
-            return Err(ParseError {
+        let envelope_name = tokens.next().map(String::from).ok_or_else(|| 
+            ParseError {
                 message: Some("probably missing an envelope name".to_string()),
                 context: Some(line.to_string()),
-            });
-        };
+            }
+        )?;
+
+        let account_name = tokens.next().map(String::from).ok_or_else(||
+            ParseError {
+                message: Some("probably missing an account name".to_string()),
+                context: Some(line.to_string()),
+            }
+        )?;
 
         // hopefully collects the remainder of the tokens, and not all of the beginning ones too
         let amount_tokens: String = tokens.collect();
@@ -405,7 +401,7 @@ impl fmt::Display for ClassicPosting {
 
 impl fmt::Display for EnvelopePosting {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let prelude = format!("envelope {} {}", self.account_name, self.envelope_name);
+        let prelude = format!("envelope {} {}", self.envelope_name, self.account_name);
         write!(f, "{:50} {}", prelude, self.amount)
     }
 }

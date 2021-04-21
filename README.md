@@ -293,10 +293,10 @@ Of course, things can get a little more complicated:
 
 ```
 2019/08/02 * Groceries with cash back
-    assets:checking                 -70
-    assets:cash                      20
-    expenses:groceries               50
-    envelope assets:checking food   -50
+    assets:checking                -70
+    assets:cash                     20
+    expenses:groceries              50
+    envelope food assets:checking  -50
 ```
 
 If `assets:checking` and `assets:cash` both have `food`
