@@ -1,4 +1,6 @@
 use crate::errors::*;
+use crate::parsing::is_amount_quantity_char;
+use crate::parsing::is_amount_symbol_char;
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
@@ -31,10 +33,14 @@ impl Amount {
         // parse magnitude
         let mut raw_mag = clump
             .chars()
-            .filter(|&c| is_mag_char(c, decimal_symbol))
+            .filter(|&c| is_amount_quantity_char(c))
             .collect::<String>();
 
         if decimal_symbol != '.' {
+            // remove dots
+            raw_mag = raw_mag.replace(".", "");
+
+            // then replace decimal characters with dots
             raw_mag = raw_mag.replace(decimal_symbol, ".");
         }
 
@@ -51,7 +57,7 @@ impl Amount {
         // parse symbol
         let raw_sym = clump
             .chars()
-            .filter(|&c| Self::is_symbol_char(c, decimal_symbol))
+            .filter(|&c| is_amount_symbol_char(c))
             .collect::<String>();
         let trimmed_raw_sym = raw_sym.trim();
         let symbol = match trimmed_raw_sym.len() {
@@ -68,11 +74,6 @@ impl Amount {
             mag: 0.0,
             symbol: None,
         }
-    }
-
-    /// Returns true if the char not a magnitude character, dot, or comma.
-    fn is_symbol_char(c: char, decimal_symbol: char) -> bool {
-        !is_mag_char(c, decimal_symbol) && c != '.' && c != ','
     }
 
     fn rounded_mag(&self) -> f64 {
@@ -396,9 +397,4 @@ impl fmt::Display for AmountPool {
             }
         }
     }
-}
-
-/// Returns true if the char is a digit, decimal symbol, or dash.
-fn is_mag_char(c: char, decimal_symbol: char) -> bool {
-    c.is_digit(10) || c == decimal_symbol || c == '-'
 }
