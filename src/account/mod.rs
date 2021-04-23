@@ -266,7 +266,7 @@ mod tests {
     const DEFAULT_DATE_FORMAT: &str = "%Y/%m/%d";
 
     #[test]
-    fn parse_test() {
+    fn test_parse() {
         // do the thing
         let account = match Account::parse(ACCOUNT_STR, '.', DEFAULT_DATE_FORMAT) {
             Ok(a) => a,

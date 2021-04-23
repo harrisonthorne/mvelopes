@@ -18,14 +18,15 @@ pub fn eol_comment(line: &str) -> IResult<&str, &str> {
     )(line)
 }
 
-/// Returns true if the char is a digit, period, comma, or dash.
+/// Returns true if the char is a digit, period, comma, underscore, or dash. Either a period,
+/// comma, or underscore can be used as a thousands separator.
 pub fn is_amount_quantity_char(c: char) -> bool {
-    c.is_digit(10) || c == ',' || c == '.' || c == '-'
+    c.is_digit(10) || "-,._".contains(c)
 }
 
-/// Returns true if the char can quality as the symbol for an amount.
+/// Returns true if the char can qualify as part of a symbol for an amount.
 pub fn is_amount_symbol_char(c: char) -> bool {
-    !is_amount_quantity_char(c) && !c.is_whitespace()
+    !is_amount_quantity_char(c) && !c.is_whitespace() && c != ';' && c != '/'
 }
 
 mod tests {

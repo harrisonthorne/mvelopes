@@ -1,9 +1,9 @@
 use crate::errors::*;
-use crate::parsing::is_amount_quantity_char;
-use crate::parsing::is_amount_symbol_char;
-use std::cmp::Ordering;
-use std::fmt;
-use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use std::{
+    cmp::Ordering,
+    fmt,
+    ops::{Add, AddAssign, Neg, Sub, SubAssign},
+};
 
 #[derive(Clone, Debug)]
 pub struct Amount {
@@ -12,60 +12,11 @@ pub struct Amount {
 }
 
 impl Amount {
+    #[deprecated = "the `silverfox::parsing` module provides tools for parsing silverfox data. this function uses that module internally, but scraps any leftover characters not part of the parsed amount"]
     pub fn parse(s: &str, decimal_symbol: char) -> Result<Self, ParseError> {
-        // reassign and remove double negatives
-        let s = s.replace("--", "");
-
-        let split = s.split_whitespace().collect::<Vec<&str>>();
-
-        let clump = match split.len() {
-            2 => split.join(" "),
-            1 => split[0].to_string(),
-            _ => {
-                return Err(ParseError {
-                    context: Some(s.to_string()),
-                    message: Some("this amount isn't valid".to_string()),
-                })
-            }
-        };
-
-        // parse amount and currency in the same chunk
-        // parse magnitude
-        let mut raw_mag = clump
-            .chars()
-            .filter(|&c| is_amount_quantity_char(c))
-            .collect::<String>();
-
-        if decimal_symbol != '.' {
-            // remove dots
-            raw_mag = raw_mag.replace(".", "");
-
-            // then replace decimal characters with dots
-            raw_mag = raw_mag.replace(decimal_symbol, ".");
-        }
-
-        let mag = match raw_mag.parse::<f64>() {
-            Ok(m) => m,
-            Err(_) => {
-                return Err(ParseError {
-                    message: Some(String::from("couldn't parse magnitude of amount")),
-                    context: Some(s.to_string()),
-                })
-            }
-        };
-
-        // parse symbol
-        let raw_sym = clump
-            .chars()
-            .filter(|&c| is_amount_symbol_char(c))
-            .collect::<String>();
-        let trimmed_raw_sym = raw_sym.trim();
-        let symbol = match trimmed_raw_sym.len() {
-            0 => None,
-            _ => Some(trimmed_raw_sym.to_string()),
-        };
-
-        Ok(Self { mag, symbol })
+        // see? look, we just throw away the leftovers here. just like how i throw
+        // away leftovers every week. because i won't eat them
+        crate::parsing::amount::parse_amount(s, decimal_symbol).map(|(_, a)| a)
     }
 
     /// Returns a blank amount without a symbol.
@@ -115,7 +66,7 @@ impl Ord for Amount {
 
 impl PartialOrd for Amount {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        assert_eq!(self.symbol, other.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, other);
+        assert_eq!(self.symbol, other.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, other);
 
         Some(self.cmp(other))
     }
@@ -134,7 +85,7 @@ impl Add for Amount {
     type Output = Self;
 
     fn add(mut self, rhs: Amount) -> Self::Output {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag += rhs.mag;
 
@@ -145,7 +96,7 @@ impl Add for Amount {
 /// += operator
 impl AddAssign for Amount {
     fn add_assign(&mut self, rhs: Amount) {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag += rhs.mag;
     }
@@ -163,7 +114,7 @@ impl Sub for Amount {
 /// -= operator
 impl SubAssign for Amount {
     fn sub_assign(&mut self, rhs: Amount) {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag -= rhs.mag;
     }
@@ -186,7 +137,7 @@ impl Add<&Amount> for Amount {
     type Output = Self;
 
     fn add(mut self, rhs: &Amount) -> Self::Output {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag += rhs.mag;
 
@@ -197,7 +148,7 @@ impl Add<&Amount> for Amount {
 /// += operator
 impl AddAssign<&Amount> for Amount {
     fn add_assign(&mut self, rhs: &Amount) {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag += rhs.mag;
     }
@@ -208,7 +159,7 @@ impl Sub<&Amount> for Amount {
     type Output = Self;
 
     fn sub(mut self, rhs: &Amount) -> Self::Output {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag -= rhs.mag;
 
@@ -219,7 +170,7 @@ impl Sub<&Amount> for Amount {
 /// -= operator
 impl SubAssign<&Amount> for Amount {
     fn sub_assign(&mut self, rhs: &Amount) {
-        assert_eq!(self.symbol, rhs.symbol,"tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them." , self, rhs);
+        assert_eq!(self.symbol, rhs.symbol, "tried to operate on two amounts with differing symbols: {} and {}. developers should check for non-matching Amount symbols before performing operations on them.", self, rhs);
 
         self.mag -= rhs.mag;
     }
@@ -358,12 +309,12 @@ impl AmountPool {
     /// magnitiude.
     pub fn is_zero(&self) -> bool {
         if self.is_empty() {
-            return true
+            return true;
         }
 
         for amt in &self.pool {
             if amt.mag != 0.0 {
-                return false
+                return false;
             }
         }
 
