@@ -1,12 +1,10 @@
+use nom::sequence::preceded;
 use nom::{
     branch::alt, bytes::complete::take_while1, character::complete::space0, combinator::map,
     sequence::separated_pair, IResult,
 };
 
-use crate::{
-    amount::Amount,
-    errors::ParseError,
-};
+use crate::{amount::Amount, errors::ParseError};
 
 use super::{is_amount_quantity_char, is_amount_symbol_char};
 
@@ -14,20 +12,26 @@ pub fn parse_amount(input: &str, decimal_symbol: char) -> Result<(String, Amount
     // reassign to remove double negatives
     let input = input.replace("--", "");
 
-    let (leftover, (symbol_raw, quantity_raw)) = alt((
+    let amount_parser = alt((
         symbol_then_number,
         map(number_then_symbol, |(x, y)| (y, x)),
         map(number_only, |n| ("", n)),
-    ))(&input)
-    .map_err(|_| ParseError {
-        context: Some(input.to_string()),
-        message: Some(String::from("none of this could be parsed as an amount")),
-    })?;
+    ));
+
+    // using `preceded` in case the amount starts with whitespace
+    let (leftover, (symbol_raw, quantity_raw)) =
+        preceded(space0, amount_parser)(&input).map_err(|_| ParseError {
+            context: Some(input.to_string()),
+            message: Some(String::from("none of this could be parsed as an amount")),
+        })?;
 
     // replace `quantity_raw`; transform quantity string into a format that Rust can parse
     let quantity_raw = {
         // remove thousands separators
-        let x: String = quantity_raw.chars().filter(|&c| c.is_digit(10) || c == '-' || c == decimal_symbol).collect();
+        let x: String = quantity_raw
+            .chars()
+            .filter(|&c| c.is_digit(10) || c == '-' || c == decimal_symbol)
+            .collect();
 
         // replace decimal symbol with dot, if needed
         if decimal_symbol != '.' {
@@ -181,24 +185,59 @@ mod tests {
         test("%20.", '.', (String::new(), amount("%", 20.0)));
         test("$100.000,4", ',', (String::new(), amount("$", 100_000.4)));
         test("$,6", ',', (String::new(), amount("$", 0.6)));
-        test("$1_000_000.5", '.', (String::new(), amount("$", 1_000_000.5)));
-        test("$1_000_000,123_456", ',', (String::new(), amount("$", 1_000_000.123456)));
+        test(
+            "$1_000_000.5",
+            '.',
+            (String::new(), amount("$", 1_000_000.5)),
+        );
+        test(
+            "$1_000_000,123_456",
+            ',',
+            (String::new(), amount("$", 1_000_000.123456)),
+        );
 
         test(
             "$123 ; a wild comment appeared!",
             '.',
-            (" ; a wild comment appeared!".to_string(), amount("$", 123.0)),
+            (
+                " ; a wild comment appeared!".to_string(),
+                amount("$", 123.0),
+            ),
         );
-        test("127h//yoink", '.', ("//yoink".to_string(), amount("h", 127.0)));
+        test(
+            "127h//yoink",
+            '.',
+            ("//yoink".to_string(), amount("h", 127.0)),
+        );
 
         test("$100 ex", '.', (String::from(" ex"), amount("$", 100.0)));
-        test("BTC100.oops", '.', (String::from("oops"), amount("BTC", 100.0)));
-        test("500 ETH weiner", '.', (String::from(" weiner"), amount("ETH", 500.0)));
-        test("456.7 DOGE boye", '.', (String::from(" boye"), amount("DOGE", 456.7)));
-        test("891,1 commas extra", ',', (String::from(" extra"), amount("commas", 891.1)));
+        test(
+            "BTC100.oops",
+            '.',
+            (String::from("oops"), amount("BTC", 100.0)),
+        );
+        test(
+            "500 ETH weiner",
+            '.',
+            (String::from(" weiner"), amount("ETH", 500.0)),
+        );
+        test(
+            "456.7 DOGE boye",
+            '.',
+            (String::from(" boye"), amount("DOGE", 456.7)),
+        );
+        test(
+            "891,1 commas extra",
+            ',',
+            (String::from(" extra"), amount("commas", 891.1)),
+        );
 
-        // no leading spaces or tabs allowed
-        assert!(parse_amount(" 600spaces", '.').is_err());
-        assert!(parse_amount("\t2_000.watts", '.').is_err());
+        // testing leading spaces
+        test(" 600spaces", '.', (String::new(), amount("spaces", 600.0)));
+        test(
+            "\t2_000.watts",
+            '.',
+            (String::new(), amount("watts", 2000.0)),
+        );
     }
 }
