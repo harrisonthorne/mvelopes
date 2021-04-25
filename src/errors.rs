@@ -1,7 +1,8 @@
 use std::error::Error;
 use std::fmt;
-use std::fmt::Display;
 use std::path::{Path, PathBuf};
+
+use nom::error::FromExternalError;
 
 // TODO auto-fixable errors?
 
@@ -71,7 +72,7 @@ impl SilverfoxError {
 
 /// ParseError is thrown during the parsing phase of ledger construction. If silverfox can't parse
 /// something, this error type will be thrown.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ParseError {
     pub context: Option<String>,
     pub message: Option<String>,
@@ -88,9 +89,15 @@ impl From<nom::Needed> for ParseError {
     }
 }
 
+impl<I, E> FromExternalError<I, E> for ParseError {
+    fn from_external_error(input: I, kind: nom::error::ErrorKind, e: E) -> Self {
+        todo!()
+    }
+}
+
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let (Some(message), Some(context)) = (self.message, self.context) {
+        if let (Some(message), Some(context)) = (&self.message, &self.context) {
             write!(
                 f,
                 "silverfox couldn't understand the following:\n\n{}\n\n{}",

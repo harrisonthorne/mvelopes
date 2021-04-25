@@ -61,10 +61,10 @@ fn parse_envelope_posting_information(
                 message: Some("probably missing an account name. silverfox currently doesn't support implicit accounts in manual envelope postings".to_string()),
             }
         ))?;
-    let (leftover, amount) = super::amount::parse_amount(input, decimal_symbol)?;
+    let (leftover, amount) = super::amount::parse_amount(decimal_symbol)(input)?;
 
     Ok((
-        leftover,
+        &leftover,
         EnvelopePosting::new(account_name, amount, envelope_name),
     ))
 }
@@ -74,7 +74,7 @@ fn parse_normal_posting_information(
     input: &str,
     decimal_symbol: char,
 ) -> IResult<&str, ClassicPosting, ParseError> {
-    let orig = input.clone();
+    let orig = input.to_string();
 
     let (input, account) =
         preceded(space0, is_not(" \t\n\r"))(input).map_err(|e: nom::Err<(&str, ErrorKind)>| {
@@ -86,7 +86,7 @@ fn parse_normal_posting_information(
             })
         })?;
 
-    let (input, amount) = opt(|inp| parse_amount(inp, decimal_symbol))(input).map_err(|e| e.map(|_| ParseError {
+    let (input, amount) = opt(parse_amount(decimal_symbol))(input).map_err(|e| e.map(|e| ParseError {
         context: Some(input.to_string()),
         message: Some(format!("an issue occurred when trying to parse an amount here.\nthis probably isn't supposed to happen. here's some extra info on this error: {}", e)),
     }))?;
@@ -98,27 +98,27 @@ fn parse_normal_posting_information(
 
     Ok((
         leftover,
-        ClassicPosting {
+        ClassicPosting::new( 
+            account,
             amount,
-            account: account.to_string(),
             cost_assertion,
             balance_assertion,
-        },
+        ),
     ))
 }
 
 fn parse_cost_assertion(input: &str, decimal_symbol: char) -> IResult<&str, Cost, ParseError> {
     let by_unit = map(
-        preceded(pair(alt((tag("@"), tag("each"))), space1), |inp| {
-            parse_amount(inp, decimal_symbol)
-        }),
+        preceded(pair(alt((tag("@"), tag("each"))), space1), 
+            parse_amount(decimal_symbol)
+        ),
         Cost::UnitCost,
     );
 
     let by_total = map(
         preceded(
             pair(alt((tag("@@"), tag("=="), tag("totaling"))), space1),
-            |inp| parse_amount(inp, decimal_symbol),
+            parse_amount(decimal_symbol),
         ),
         Cost::TotalCost,
     );
@@ -132,7 +132,9 @@ fn parse_cost_assertion(input: &str, decimal_symbol: char) -> IResult<&str, Cost
 }
 
 fn parse_balance_assertion(input: &str, decimal_symbol: char) -> IResult<&str, Amount, ParseError> {
-    preceded(pair(alt((tag("!"), tag("="), tag("bal"))), space1), |inp| {
-        parse_amount(inp, decimal_symbol)
-    })(input)
+    let tags = (tag("!"), tag("="), tag("bal"));
+    preceded(
+        pair(alt(tags), space1),
+        parse_amount(decimal_symbol)
+    )(input)
 }

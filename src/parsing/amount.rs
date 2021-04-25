@@ -1,78 +1,77 @@
+use nom::combinator::map_res;
 use nom::sequence::preceded;
-use nom::{
-    branch::alt, bytes::complete::take_while1, character::complete::space0, combinator::map,
-    sequence::separated_pair, IResult,
-};
+use nom::{IResult, branch::alt, bytes::complete::take_while1, character::complete::space0, combinator::map, sequence::separated_pair};
 
 use crate::{amount::Amount, errors::ParseError};
 
 use super::{is_amount_quantity_char, is_amount_symbol_char};
 
-pub fn parse_amount(input: &str, decimal_symbol: char) -> IResult<&str, Amount, ParseError> {
-    // reassign to remove double negatives
-    let input = input.replace("--", "");
+pub fn parse_amount(decimal_symbol: char) -> impl FnMut(&str) -> IResult<&str, Amount, ParseError> {
+    move |input| {
+        let amount_parser = alt((
+            symbol_then_number(decimal_symbol),
+            map(number_then_symbol(decimal_symbol), |(x, y)| (y, x)),
+            map(number_only(decimal_symbol), |n| ("", n)),
+        ));
 
-    let amount_parser = alt((
-        symbol_then_number,
-        map(number_then_symbol, |(x, y)| (y, x)),
-        map(number_only, |n| ("", n)),
-    ));
+        // using `preceded` in case the amount starts with whitespace
+        map(preceded(space0, amount_parser), |(symbol_raw, quantity)| {
+            Amount {
+                symbol: if symbol_raw.trim().is_empty() {
+                    // symbol_raw shouldn't have spaces in it, but better safe than sorry
+                    None
+                } else {
+                    Some(symbol_raw.to_string())
+                },
+                mag: quantity,
+            }
+        })(&input)
+        .map_err(|e| {
+            e.map(|_| ParseError {
+                context: Some(input.to_string()),
+                message: Some(String::from("none of this could be parsed as an amount")),
+            })
+        })
+    }
+}
 
-    // using `preceded` in case the amount starts with whitespace
-    let (leftover, (symbol_raw, quantity_raw)) =
-        preceded(space0, amount_parser)(&input).map_err(|e| e.map(|_| ParseError {
-            context: Some(input.to_string()),
-            message: Some(String::from("none of this could be parsed as an amount")),
-        }))?;
+/// Returns (symbol, number)
+fn symbol_then_number(decimal_symbol: char) -> impl FnMut(&str) -> IResult<&str, (&str, f64)> {
+    move |input| separated_pair(symbol_only, space0, number_only(decimal_symbol))(input)
+}
 
-    // transform the quantity string into a format that Rust can parse. replace `quantity_raw`
-    let quantity_raw = {
-        // remove thousands separators
-        let x: String = quantity_raw
-            .chars()
-            .filter(|&c| c.is_digit(10) || c == '-' || c == decimal_symbol)
-            .collect();
+/// Returns (number, symbol)
+fn number_then_symbol(decimal_symbol: char) -> impl FnMut(&str) -> IResult<&str, (f64, &str)> {
+    move |input| separated_pair(number_only(decimal_symbol), space0, symbol_only)(input)
+}
 
-        // replace decimal symbol with dot, if needed
-        if decimal_symbol != '.' {
-            x.replace(decimal_symbol, ".")
-        } else {
-            x
-        }
-    };
+fn number_only(decimal_symbol: char) -> impl FnMut(&str) -> IResult<&str, f64> {
+    move |input| {
+        map_res(take_while1(is_amount_quantity_char), |x: &str| {
+            // double negatives == positives so remove them
+            let mut x = x.replace("--", "");
 
-    Ok((
-        leftover,
-        Amount {
-            symbol: if symbol_raw.trim().is_empty() {
-                // symbol_raw shouldn't have spaces in it, but better safe than sorry
-                None
-            } else {
-                Some(symbol_raw.to_string())
-            },
-            mag: quantity_raw.parse().map_err(|e| nom::Err::Error(ParseError {
+            // transform the quantity string into a format that Rust can parse.
+            // remove thousands separators
+            x = x
+                .chars()
+                .filter(|&c| c.is_digit(10) || c == '-' || c == decimal_symbol)
+                .collect();
+
+            // replace decimal symbol with dot, if needed
+            if decimal_symbol != '.' {
+                x = x.replace(decimal_symbol, ".")
+            }
+
+            x.parse::<f64>().map_err(|e| ParseError {
                 context: Some(format!(r#""{}""#, input)),
                 message: Some(format!(
                     "couldn't parse this as a number\nmore info: {:#?}",
                     e
                 )),
-            }))?,
-        },
-    ))
-}
-
-/// Returns (symbol, number)
-fn symbol_then_number(input: &str) -> IResult<&str, (&str, &str)> {
-    separated_pair(symbol_only, space0, number_only)(input)
-}
-
-/// Returns (number, symbol)
-fn number_then_symbol(input: &str) -> IResult<&str, (&str, &str)> {
-    separated_pair(number_only, space0, symbol_only)(input)
-}
-
-fn number_only(input: &str) -> IResult<&str, &str> {
-    take_while1(is_amount_quantity_char)(input)
+            })
+        })(input)
+    }
 }
 
 fn symbol_only(input: &str) -> IResult<&str, &str> {
@@ -84,78 +83,78 @@ mod tests {
 
     #[test]
     fn test_symbol_then_number_separate() {
-        assert_eq!(symbol_then_number("$ 123"), Ok(("", ("$", "123"))));
-        assert_eq!(symbol_then_number("Rs 123"), Ok(("", ("Rs", "123"))));
-        assert_eq!(symbol_then_number("BTC 123"), Ok(("", ("BTC", "123"))));
-        assert_eq!(symbol_then_number("p 123,92"), Ok(("", ("p", "123,92"))));
-        assert_eq!(symbol_then_number("h 1 "), Ok((" ", ("h", "1"))));
+        assert_eq!(symbol_then_number('.')("$ 123"), Ok(("", ("$", 123.0))));
+        assert_eq!(symbol_then_number('.')("Rs 123"), Ok(("", ("Rs", 123.0))));
+        assert_eq!(symbol_then_number('.')("BTC 123"), Ok(("", ("BTC", 123.0))));
+        assert_eq!(symbol_then_number(',')("p 123,92"), Ok(("", ("p", 123.92))));
+        assert_eq!(symbol_then_number('.')("h 1 "), Ok((" ", ("h", 1.0))));
         assert_eq!(
-            symbol_then_number("$ 100 extra stuff"),
-            Ok((" extra stuff", ("$", "100")))
+            symbol_then_number('.')("$ 100 extra stuff"),
+            Ok((" extra stuff", ("$", 100.0)))
         );
-        assert!(symbol_then_number(" h 1").is_err());
-        assert!(symbol_then_number("12").is_err());
-        assert!(symbol_then_number("$").is_err());
+        assert!(symbol_then_number('.')(" h 1").is_err());
+        assert!(symbol_then_number('.')("12").is_err());
+        assert!(symbol_then_number('.')("$").is_err());
     }
 
     #[test]
     fn test_number_then_symbol_separate() {
-        assert_eq!(number_then_symbol("123 $"), Ok(("", ("123", "$"))));
-        assert_eq!(number_then_symbol("123 Rs"), Ok(("", ("123", "Rs"))));
-        assert_eq!(number_then_symbol("123 BTC"), Ok(("", ("123", "BTC"))));
-        assert_eq!(number_then_symbol("123,92 p"), Ok(("", ("123,92", "p"))));
-        assert_eq!(number_then_symbol("1 h "), Ok((" ", ("1", "h"))));
+        assert_eq!(number_then_symbol('.')("123 $"), Ok(("", (123., "$"))));
+        assert_eq!(number_then_symbol('.')("123 Rs"), Ok(("", (123.0, "Rs"))));
+        assert_eq!(number_then_symbol('.')("123 BTC"), Ok(("", (123.0, "BTC"))));
+        assert_eq!(number_then_symbol(',')("123,92 p"), Ok(("", (123.92, "p"))));
+        assert_eq!(number_then_symbol('.')("1 h "), Ok((" ", (1.0, "h"))));
         assert_eq!(
-            number_then_symbol("100 $ extra stuff"),
-            Ok((" extra stuff", ("100", "$")))
+            number_then_symbol('.')("100 $ extra stuff"),
+            Ok((" extra stuff", (100.0, "$")))
         );
-        assert!(number_then_symbol(" 1 h").is_err());
-        assert!(number_then_symbol("12").is_err());
-        assert!(number_then_symbol("$").is_err());
+        assert!(number_then_symbol('.')(" 1 h").is_err());
+        assert!(number_then_symbol('.')("12").is_err());
+        assert!(number_then_symbol('.')("$").is_err());
     }
 
     #[test]
     fn test_symbol_then_number_together() {
-        assert_eq!(symbol_then_number("$123"), Ok(("", ("$", "123"))));
-        assert_eq!(symbol_then_number("Rs123"), Ok(("", ("Rs", "123"))));
-        assert_eq!(symbol_then_number("BTC123"), Ok(("", ("BTC", "123"))));
-        assert_eq!(symbol_then_number("p123,92"), Ok(("", ("p", "123,92"))));
-        assert_eq!(symbol_then_number("h1 "), Ok((" ", ("h", "1"))));
+        assert_eq!(symbol_then_number('.')("$123"), Ok(("", ("$", 123.0))));
+        assert_eq!(symbol_then_number('.')("Rs123"), Ok(("", ("Rs", 123.0))));
+        assert_eq!(symbol_then_number('.')("BTC123"), Ok(("", ("BTC", 123.0))));
+        assert_eq!(symbol_then_number(',')("p123,92"), Ok(("", ("p", 123.92))));
+        assert_eq!(symbol_then_number('.')("h1 "), Ok((" ", ("h", 1.0))));
         assert_eq!(
-            symbol_then_number("$100 extra stuff"),
-            Ok((" extra stuff", ("$", "100")))
+            symbol_then_number('.')("$100 extra stuff"),
+            Ok((" extra stuff", ("$", 100.0)))
         );
-        assert!(symbol_then_number(" h1").is_err());
-        assert!(symbol_then_number("12").is_err());
-        assert!(symbol_then_number("$").is_err());
+        assert!(symbol_then_number('.')(" h1").is_err());
+        assert!(symbol_then_number('.')("12").is_err());
+        assert!(symbol_then_number('.')("$").is_err());
     }
 
     #[test]
     fn test_number_then_symbol_together() {
-        assert_eq!(number_then_symbol("123$"), Ok(("", ("123", "$"))));
-        assert_eq!(number_then_symbol("123Rs"), Ok(("", ("123", "Rs"))));
-        assert_eq!(number_then_symbol("123BTC"), Ok(("", ("123", "BTC"))));
-        assert_eq!(number_then_symbol("123,92p"), Ok(("", ("123,92", "p"))));
-        assert_eq!(number_then_symbol("1h "), Ok((" ", ("1", "h"))));
+        assert_eq!(number_then_symbol('.')("123$"), Ok(("", (123.0, "$"))));
+        assert_eq!(number_then_symbol('.')("123Rs"), Ok(("", (123.0, "Rs"))));
+        assert_eq!(number_then_symbol('.')("123BTC"), Ok(("", (123.0, "BTC"))));
+        assert_eq!(number_then_symbol(',')("123,92p"), Ok(("", (123.92, "p"))));
+        assert_eq!(number_then_symbol('.')("1h "), Ok((" ", (1.0, "h"))));
         assert_eq!(
-            number_then_symbol("100$ extra stuff"),
-            Ok((" extra stuff", ("100", "$")))
+            number_then_symbol('.')("100$ extra stuff"),
+            Ok((" extra stuff", (100.0, "$")))
         );
-        assert!(number_then_symbol(" 1h").is_err());
-        assert!(number_then_symbol("12").is_err());
-        assert!(number_then_symbol("$").is_err());
+        assert!(number_then_symbol('.')(" 1h").is_err());
+        assert!(number_then_symbol('.')("12").is_err());
+        assert!(number_then_symbol('.')("$").is_err());
     }
 
     #[test]
     fn test_number_only() {
-        assert_eq!(number_only("123"), Ok(("", "123")));
-        assert_eq!(number_only("456.789"), Ok(("", "456.789")));
-        assert_eq!(number_only("111.222.333,444"), Ok(("", "111.222.333,444")));
-        assert_eq!(number_only("111,222,333.444"), Ok(("", "111,222,333.444")));
-        assert_eq!(number_only("123BTC"), Ok(("BTC", "123")));
-        assert_eq!(number_only("123 BTC"), Ok((" BTC", "123")));
-        assert!(number_only(" 123").is_err());
-        assert!(number_only("$123").is_err());
+        assert_eq!(number_only('.')("123"), Ok(("", 123.0)));
+        assert_eq!(number_only('.')("456.789"), Ok(("", 456.789)));
+        assert_eq!(number_only(',')("111.222.333,444"), Ok(("", 111_222_333.444)));
+        assert_eq!(number_only('.')("111,222,333.444"), Ok(("", 111_222_333.444)));
+        assert_eq!(number_only('.')("123BTC"), Ok(("BTC", 123.0)));
+        assert_eq!(number_only('.')("123 BTC"), Ok((" BTC", 123.0)));
+        assert!(number_only('.')(" 123").is_err());
+        assert!(number_only('.')("$123").is_err());
     }
 
     #[test]
@@ -177,7 +176,7 @@ mod tests {
             mag: quant,
         };
         let test = |input, dec, expected| {
-            assert_eq!(parse_amount(input, dec).unwrap(), expected);
+            assert_eq!(parse_amount(dec)(input).unwrap(), expected);
         };
 
         test("$100", '.', ("", amount("$", 100.0)));
