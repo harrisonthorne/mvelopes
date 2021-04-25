@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 // TODO auto-fixable errors?
@@ -78,28 +79,53 @@ pub struct ParseError {
 
 impl Error for ParseError {}
 
+impl From<nom::Needed> for ParseError {
+    fn from(n: nom::Needed) -> Self {
+        Self {
+            context: None,
+            message: Some(format!("silverfox ran into an issue because some information went missing.\nneeded: {:?}", n)),
+        }
+    }
+}
+
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.message.is_some() && self.context.is_some() {
+        if let (Some(message), Some(context)) = (self.message, self.context) {
             write!(
                 f,
                 "silverfox couldn't understand the following:\n\n{}\n\n{}",
-                self.context.as_ref().unwrap(),
-                self.message.as_ref().unwrap(),
+                context,
+                message,
             )
-        } else if let Some(a) = &self.message {
-            write!(f, "silverfox ran across an issue in your journal: {}", a)
-        } else if let Some(b) = &self.context {
+        } else if let Some(m) = &self.message {
+            write!(f, "silverfox ran across an issue in your journal: {}", m)
+        } else if let Some(c) = &self.context {
             write!(
                 f,
                 "silverfox couldn't understand this:\n\n{}\n\nbut no explanation was provided",
-                b
+                c
             )
         } else {
             write!(
                 f,
                 "silverfox couldn't parse something, but no information was provided"
             )
+        }
+    }
+}
+
+impl nom::error::ParseError<&str> for ParseError {
+    fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
+        Self {
+            context: Some(input.to_string()),
+            message: Some(format!("error occurred in {:?} parser", kind))
+        }
+    }
+
+    fn append(input: &str, kind: nom::error::ErrorKind, other: Self) -> Self {
+        Self {
+            context: Some(input.to_string()),
+            message: Some(format!("error occurred in {:?} parser.\nadditionally, {}", kind, other))
         }
     }
 }
