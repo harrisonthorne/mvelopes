@@ -288,7 +288,7 @@ impl AmountPool {
     /// If there is one or more amounts with zero magnitude, this function returns false because
     /// there are still amounts being tracked within this pool.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.pool.is_empty()
     }
 
     pub fn new() -> Self {
