@@ -79,7 +79,7 @@ fn parse_normal_posting_information(
     let (input, account) =
         preceded(space0, is_not(" \t\n\r"))(input).map_err(|e: nom::Err<(&str, ErrorKind)>| {
             e.map(|_| ParseError {
-                context: Some(input.to_string()),
+                context: Some(orig),
                 message: Some(
                     "an account name couldn't be found (or parsed for that matter)".to_string(),
                 ),

@@ -84,14 +84,17 @@ impl From<nom::Needed> for ParseError {
     fn from(n: nom::Needed) -> Self {
         Self {
             context: None,
-            message: Some(format!("silverfox ran into an issue because some information went missing.\nneeded: {:?}", n)),
+            message: Some(format!("silverfox ran into a parsing issue because some information went missing.\nneeded: {:?}", n)),
         }
     }
 }
 
-impl<I, E> FromExternalError<I, E> for ParseError {
+impl<I: ToString, E: Error> FromExternalError<I, E> for ParseError {
     fn from_external_error(input: I, kind: nom::error::ErrorKind, e: E) -> Self {
-        todo!()
+        Self {
+            context: Some(input.to_string()),
+            message: Some(format!("more information: {} (in `{:?}` parser)", e, kind)),
+        }
     }
 }
 
