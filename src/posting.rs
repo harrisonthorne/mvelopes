@@ -4,7 +4,7 @@ use crate::utils;
 use std::collections::HashSet;
 use std::fmt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ClassicPosting {
     amount: Option<Amount>,
     account: String,
@@ -12,7 +12,7 @@ pub struct ClassicPosting {
     balance_assertion: Option<Amount>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EnvelopePosting {
     account_name: String,
     envelope_name: String,
@@ -20,10 +20,10 @@ pub struct EnvelopePosting {
 }
 
 impl EnvelopePosting {
-    pub fn new(account_name: String, amount: Amount, envelope_name: String) -> Self {
+    pub fn new(account_name: &str, amount: Amount, envelope_name: &str) -> Self {
         Self {
-            account_name,
-            envelope_name,
+            account_name: account_name.to_owned(),
+            envelope_name: envelope_name.to_owned(),
             amount,
         }
     }
@@ -35,19 +35,15 @@ impl EnvelopePosting {
     ) -> Result<Self, ParseError> {
         let mut tokens = line.split_whitespace().skip(1);
 
-        let envelope_name = tokens.next().map(String::from).ok_or_else(|| 
-            ParseError {
-                message: Some("probably missing an envelope name".to_string()),
-                context: Some(line.to_string()),
-            }
-        )?;
+        let envelope_name = tokens.next().map(String::from).ok_or_else(|| ParseError {
+            message: Some("probably missing an envelope name".to_string()),
+            context: Some(line.to_string()),
+        })?;
 
-        let account_name = tokens.next().map(String::from).ok_or_else(||
-            ParseError {
-                message: Some("probably missing an account name".to_string()),
-                context: Some(line.to_string()),
-            }
-        )?;
+        let account_name = tokens.next().map(String::from).ok_or_else(|| ParseError {
+            message: Some("probably missing an account name".to_string()),
+            context: Some(line.to_string()),
+        })?;
 
         // hopefully collects the remainder of the tokens, and not all of the beginning ones too
         let amount_tokens: String = tokens.collect();
@@ -86,7 +82,7 @@ impl Default for EnvelopePosting {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Posting {
     Classic(ClassicPosting),
     Envelope(EnvelopePosting),
@@ -284,9 +280,7 @@ impl ClassicPosting {
                 } else {
                     // if no price, try to parse total cost
                     match Self::parse_total_cost_amount(amount_tokens, decimal_symbol) {
-                        Ok(total_cost_opt) => {
-                            total_cost_opt
-                        }
+                        Ok(total_cost_opt) => total_cost_opt,
                         Err(e) => return Err(e),
                     }
                 }
@@ -406,7 +400,7 @@ impl fmt::Display for EnvelopePosting {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Cost {
     TotalCost(Amount),
     UnitCost(Amount),
@@ -415,7 +409,7 @@ pub enum Cost {
 impl fmt::Display for Cost {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TotalCost(a) => write!(f, " = {}", a),
+            Self::TotalCost(a) => write!(f, " == {}", a),
             Self::UnitCost(a) => write!(f, " @ {}", a),
         }
     }

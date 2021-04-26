@@ -72,7 +72,7 @@ impl SilverfoxError {
 
 /// ParseError is thrown during the parsing phase of ledger construction. If silverfox can't parse
 /// something, this error type will be thrown.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParseError {
     pub context: Option<String>,
     pub message: Option<String>,

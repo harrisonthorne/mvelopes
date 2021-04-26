@@ -1,42 +1,51 @@
-use nom::branch::permutation;
-use nom::combinator::map;
+use nom::bytes::complete::tag;
+use nom::sequence::tuple;
 use nom::{
-    branch::alt, bytes::complete::is_not, bytes::complete::tag, character::complete::space0,
-    character::complete::space1, combinator::opt, error::ErrorKind, sequence::pair,
-    sequence::preceded, IResult,
+    branch::{alt, permutation},
+    bytes::complete::is_not,
+    character::complete::{space0, space1},
+    combinator::{map, opt},
+    error::ErrorKind,
+    sequence::{pair, preceded},
+    IResult,
 };
 
-use super::{common::eol_comment, parse_amount};
+use super::parse_amount;
 
-use crate::amount::Amount;
 use crate::{
+    amount::Amount,
     errors::ParseError,
     posting::{ClassicPosting, Cost, EnvelopePosting, Posting},
 };
 
 /// Returns the leftover string and the Posting parsed.
 pub fn parse_posting(
-    line: &'static str,
     decimal_symbol: char,
-) -> IResult<&str, Posting, ParseError> {
-    let original_line = line.to_string();
+) -> impl FnMut(&str) -> IResult<&str, Posting, ParseError> {
+    move |inp| {
+        let original_line = inp.to_string();
 
-    // scrap comments
-    let input = eol_comment(line).map(|t| t.0).unwrap_or_else(|_| line);
+        // precede with whitespace, just in case
+        let (input, first_token) = preceded(space0, is_not(" \t\n\r"))(inp).map_err(
+            |e: nom::Err<(&str, ErrorKind)>| {
+                e.map(|_| ParseError {
+                    context: Some(original_line),
+                    message: Some("no posting information here".to_string()),
+                })
+            },
+        )?;
 
-    let (input, first_token) =
-        preceded(space0, is_not(" \t\n\r"))(input).map_err(|e: nom::Err<(&str, ErrorKind)>| {
-            e.map(|_| ParseError {
-                context: Some(original_line),
-                message: Some("no posting information here".to_string()),
-            })
-        })?;
-
-    if first_token == "envelope" {
-        parse_envelope_posting_information(input, decimal_symbol)
-            .map(|(l, p)| (l, Posting::from(p)))
-    } else {
-        parse_normal_posting_information(input, decimal_symbol).map(|(l, p)| (l, Posting::from(p)))
+        // the rest of the posting depends on the first token, which determines the type
+        // -    "envelope" => it's an envelope posting
+        // -    literally anything else, probably an account name => it's a classic
+        //      posting
+        if first_token == "envelope" {
+            parse_envelope_posting_information(input, decimal_symbol)
+                .map(|(l, p)| (l, Posting::from(p)))
+        } else {
+            parse_normal_posting_information(input, first_token, decimal_symbol)
+                .map(|(l, p)| (l, Posting::from(p)))
+        }
     }
 }
 
@@ -65,76 +74,212 @@ fn parse_envelope_posting_information(
 
     Ok((
         &leftover,
-        EnvelopePosting::new(account_name, amount, envelope_name),
+        EnvelopePosting::new(&account_name, amount, &envelope_name),
     ))
 }
 
 /// Parses everything after the account name in a class posting.
-fn parse_normal_posting_information(
-    input: &str,
+fn parse_normal_posting_information<'a>(
+    input: &'a str,
+    account_name: &str,
     decimal_symbol: char,
-) -> IResult<&str, ClassicPosting, ParseError> {
+) -> IResult<&'a str, ClassicPosting, ParseError> {
     let orig = input.to_string();
-
-    let (input, account) =
-        preceded(space0, is_not(" \t\n\r"))(input).map_err(|e: nom::Err<(&str, ErrorKind)>| {
-            e.map(|_| ParseError {
-                context: Some(orig),
-                message: Some(
-                    "an account name couldn't be found (or parsed for that matter)".to_string(),
-                ),
-            })
-        })?;
 
     let (input, amount) = opt(parse_amount(decimal_symbol))(input).map_err(|e| e.map(|e| ParseError {
         context: Some(input.to_string()),
         message: Some(format!("an issue occurred when trying to parse an amount here.\nthis probably isn't supposed to happen. here's some extra info on this error: {}", e)),
     }))?;
 
-    let (leftover, (cost_assertion, balance_assertion)) = permutation((
-        opt(|inp| parse_cost_assertion(inp, decimal_symbol)),
-        opt(|inp| parse_balance_assertion(inp, decimal_symbol)),
-    ))(input)?;
+    // parses cost assertion and balance assertion, checking for either one, the other, or both
+    let (leftover, (cost_assertion, balance_assertion)) = {
+        let (leftover, assertions) = opt(alt((
+            map(
+                permutation((
+                    parse_cost_assertion(decimal_symbol),
+                    parse_balance_assertion(decimal_symbol),
+                )),
+                |(ca, ba)| (Some(ca), Some(ba)),
+            ),
+            map(parse_cost_assertion(decimal_symbol), |ca| (Some(ca), None)),
+            map(parse_balance_assertion(decimal_symbol), |ba| {
+                (None, Some(ba))
+            }),
+        )))(input)?;
+
+        (leftover, assertions.unwrap_or((None, None)))
+    };
 
     Ok((
         leftover,
-        ClassicPosting::new( 
-            account,
-            amount,
-            cost_assertion,
-            balance_assertion,
-        ),
+        ClassicPosting::new(account_name, amount, cost_assertion, balance_assertion),
     ))
 }
 
-fn parse_cost_assertion(input: &str, decimal_symbol: char) -> IResult<&str, Cost, ParseError> {
-    let by_unit = map(
-        preceded(pair(alt((tag("@"), tag("each"))), space1), 
-            parse_amount(decimal_symbol)
-        ),
-        Cost::UnitCost,
-    );
+fn parse_cost_assertion(
+    decimal_symbol: char,
+) -> impl FnMut(&str) -> IResult<&str, Cost, ParseError> {
+    move |input| {
+        let by_unit = map(
+            preceded(
+                tuple((space0, tag("@"), space1)),
+                parse_amount(decimal_symbol),
+            ),
+            Cost::UnitCost,
+        );
 
-    let by_total = map(
-        preceded(
-            pair(alt((tag("@@"), tag("=="), tag("totaling"))), space1),
-            parse_amount(decimal_symbol),
-        ),
-        Cost::TotalCost,
-    );
+        let by_total = map(
+            preceded(
+                tuple((space0, alt((tag("@@"), tag("=="))), space1)),
+                parse_amount(decimal_symbol),
+            ),
+            Cost::TotalCost,
+        );
 
-    alt((by_unit, by_total))(input).map_err(|e| {
-        e.map(|_| ParseError {
-            context: Some(input.to_string()),
-            message: Some("couldn't parse this as a cost assertion".to_string()),
+        alt((by_unit, by_total))(input).map_err(|e| {
+            e.map(|_| ParseError {
+                context: Some(input.to_string()),
+                message: Some("couldn't parse this as a cost assertion".to_string()),
+            })
         })
-    })
+    }
 }
 
-fn parse_balance_assertion(input: &str, decimal_symbol: char) -> IResult<&str, Amount, ParseError> {
-    let tags = (tag("!"), tag("="), tag("bal"));
-    preceded(
-        pair(alt(tags), space1),
-        parse_amount(decimal_symbol)
-    )(input)
+fn parse_balance_assertion(
+    decimal_symbol: char,
+) -> impl FnMut(&str) -> IResult<&str, Amount, ParseError> {
+    move |input| {
+        let tags = (tag("!"), tag("="));
+        preceded(
+            tuple((space0, alt(tags), space1)),
+            parse_amount(decimal_symbol),
+        )(input)
+    }
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_posting() {
+        // basic ho
+        assert_eq!(
+            parse_posting('.')("assets:cash 10"),
+            Ok((
+                "",
+                Posting::Classic(ClassicPosting::new(
+                    "assets:cash",
+                    Some(Amount {
+                        symbol: None,
+                        mag: 10.0
+                    }),
+                    None,
+                    None,
+                ))
+            ))
+        );
+
+        // commas as decimals
+        assert_eq!(
+            parse_posting(',')("assets:checking 123,45"),
+            Ok((
+                "",
+                Posting::Classic(ClassicPosting::new(
+                    "assets:checking",
+                    Some(Amount {
+                        symbol: None,
+                        mag: 123.45
+                    }),
+                    None,
+                    None,
+                ))
+            ))
+        );
+
+        // expensive food
+        assert_eq!(
+            parse_posting(',')("envelope food assets:cash BTC -50"),
+            Ok((
+                "",
+                Posting::Envelope(EnvelopePosting::new(
+                    "assets:cash",
+                    Amount {
+                        symbol: Some("BTC".to_string()),
+                        mag: -50.0
+                    },
+                    "food"
+                ))
+            ))
+        );
+
+        // cost/balance assertions
+        assert_eq!(
+            parse_posting('.')("assets:checking 123.45 BTC @ 12345 ! 200.2 BTC"),
+            Ok((
+                "",
+                Posting::Classic(ClassicPosting::new(
+                    "assets:checking",
+                    Some(Amount {
+                        symbol: Some("BTC".to_string()),
+                        mag: 123.45
+                    }),
+                    Some(Cost::UnitCost(Amount {
+                        symbol: None,
+                        mag: 12345.0,
+                    })),
+                    Some(Amount {
+                        symbol: Some("BTC".to_string()),
+                        mag: 200.2
+                    }),
+                ))
+            ))
+        );
+
+        // ...in any order? with leftovers?
+        assert_eq!(
+            parse_posting('.')(
+                "assets:checking 123.45 BTC ! 200.2 BTC @ 12345 ; a wild comment appeared!"
+            ),
+            Ok((
+                " ; a wild comment appeared!",
+                Posting::Classic(ClassicPosting::new(
+                    "assets:checking",
+                    Some(Amount {
+                        symbol: Some("BTC".to_string()),
+                        mag: 123.45
+                    }),
+                    Some(Cost::UnitCost(Amount {
+                        symbol: None,
+                        mag: 12345.0,
+                    })),
+                    Some(Amount {
+                        symbol: Some("BTC".to_string()),
+                        mag: 200.2
+                    }),
+                ))
+            ))
+        );
+
+        // total cost assertions
+        assert_eq!(
+            parse_posting('.')(
+                "expenses:yo 123.45 BTC == 100_000 ; double equals are nice"
+            ),
+            Ok((
+                " ; double equals are nice",
+                Posting::Classic(ClassicPosting::new(
+                    "expenses:yo",
+                    Some(Amount {
+                        symbol: Some("BTC".to_string()),
+                        mag: 123.45
+                    }),
+                    Some(Cost::TotalCost(Amount {
+                        symbol: None,
+                        mag: 100_000.0,
+                    })),
+                    None,
+                ))
+            ))
+        );
+    }
 }

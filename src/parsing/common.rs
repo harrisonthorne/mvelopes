@@ -26,7 +26,7 @@ pub fn is_amount_quantity_char(c: char) -> bool {
 
 /// Returns true if the char can qualify as part of a symbol for an amount.
 pub fn is_amount_symbol_char(c: char) -> bool {
-    !is_amount_quantity_char(c) && !c.is_whitespace() && c != ';' && c != '/'
+    !is_amount_quantity_char(c) && !c.is_whitespace() && !";/@=!".contains(c)
 }
 
 mod tests {

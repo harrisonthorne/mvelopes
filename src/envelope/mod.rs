@@ -873,7 +873,7 @@ amount")
     pub fn get_filling_posting(&self, account_available_value: &AmountPool) -> EnvelopePosting {
         let amount = self.get_filling_amount(&account_available_value.only(&self.amount.symbol));
 
-        EnvelopePosting::new(self.parent_account.clone(), amount, self.name.clone())
+        EnvelopePosting::new(&self.parent_account, amount, &self.name)
     }
 
     fn get_remaining_next_amount(&self) -> Amount {
