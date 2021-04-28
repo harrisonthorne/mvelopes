@@ -449,9 +449,9 @@ impl Rules {
 
             let injected = Self::inject_variables(&raw_value, &variables);
 
-            match Posting::parse(injected.as_str(), self.decimal_symbol, account_set) {
+            match Posting::parse(injected.as_str(), self.decimal_symbol) {
                 Ok(p) => postings.push(p),
-                Err(e) => return Err(e),
+                Err(e) => return Err(SilverfoxError::from(e)),
             }
         }
 

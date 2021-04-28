@@ -1,8 +1,6 @@
-use crate::amount::Amount;
-use crate::errors::*;
-use crate::utils;
-use std::collections::HashSet;
-use std::fmt;
+use crate::{amount::Amount, errors::*};
+use nom::Finish;
+use std::{collections::HashSet, fmt};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ClassicPosting {
@@ -26,34 +24,6 @@ impl EnvelopePosting {
             envelope_name: envelope_name.to_owned(),
             amount,
         }
-    }
-
-    pub fn parse(
-        line: &str,
-        decimal_symbol: char,
-        _accounts: &HashSet<&String>,
-    ) -> Result<Self, ParseError> {
-        let mut tokens = line.split_whitespace().skip(1);
-
-        let envelope_name = tokens.next().map(String::from).ok_or_else(|| ParseError {
-            message: Some("probably missing an envelope name".to_string()),
-            context: Some(line.to_string()),
-        })?;
-
-        let account_name = tokens.next().map(String::from).ok_or_else(|| ParseError {
-            message: Some("probably missing an account name".to_string()),
-            context: Some(line.to_string()),
-        })?;
-
-        // hopefully collects the remainder of the tokens, and not all of the beginning ones too
-        let amount_tokens: String = tokens.collect();
-        let amount = Amount::parse(&amount_tokens, decimal_symbol)?;
-
-        Ok(Self {
-            account_name,
-            envelope_name,
-            amount,
-        })
     }
 
     /// Returns the name of the envelope associated with this posting
@@ -101,37 +71,15 @@ impl From<EnvelopePosting> for Posting {
 }
 
 impl Posting {
+    #[deprecated = "the `silverfox::parsing` module provides tools for parsing silverfox data. this function uses that module internally, but scraps any leftover characters not part of the parsed amount"]
     pub fn parse(
-        mut line: &str,
+        line: &str,
         decimal_symbol: char,
-        accounts: &HashSet<&String>,
-    ) -> Result<Self, SilverfoxError> {
-        // match first token, to decide on parsing an envelope posting or a classic posting
-        line = utils::remove_comments(line).trim();
-        match line.split_whitespace().next() {
-            Some(t) => {
-                if t == "envelope" {
-                    Ok(Posting::from(EnvelopePosting::parse(
-                        line,
-                        decimal_symbol,
-                        accounts,
-                    )?))
-                } else {
-                    Ok(Posting::from(ClassicPosting::parse(
-                        line,
-                        decimal_symbol,
-                        accounts,
-                    )?))
-                }
-            }
-            None => Err(SilverfoxError::from(ParseError {
-                message: Some("nothing to parse for a Posting".to_string()),
-                context: None,
-            })),
-        }
+    ) -> Result<Self, ParseError> {
+        crate::parsing::posting::parse_posting(decimal_symbol)(line)
+            .finish()
+            .map(|(_, p)| p)
     }
-
-    // getters
 
     /// Returns the Posting's Amount
     pub fn get_amount(&self) -> Option<&Amount> {
@@ -208,119 +156,6 @@ impl ClassicPosting {
             account: String::new(),
             cost_assertion: None,
             balance_assertion: None,
-        }
-    }
-
-    pub fn parse(
-        line: &str,
-        decimal_symbol: char,
-        accounts: &HashSet<&String>,
-    ) -> Result<Self, SilverfoxError> {
-        let mut posting = Self::blank();
-
-        // remove comments and other impurities
-        let trimmed_line = utils::remove_comments(line).trim();
-        let tokens = trimmed_line.split_whitespace().collect::<Vec<&str>>();
-
-        let amount_tokens: Vec<&str>;
-        posting.account = tokens[0].to_string();
-        amount_tokens = tokens[1..].to_vec();
-
-        if let Err(e) = posting.parse_amount(&amount_tokens, decimal_symbol) {
-            Err(SilverfoxError::from(e))
-        } else if let Err(e) = posting.parse_assertion_amounts(&amount_tokens, decimal_symbol) {
-            Err(SilverfoxError::from(e))
-        } else if let Err(e) = posting.validate(&accounts) {
-            Err(SilverfoxError::from(e))
-        } else {
-            Ok(posting)
-        }
-    }
-
-    fn parse_amount(
-        &mut self,
-        amount_tokens: &[&str],
-        decimal_symbol: char,
-    ) -> Result<(), ParseError> {
-        let mut iter = amount_tokens.iter();
-        let raw_amount = match iter.position(|&s| s == "@" || s == "!" || s == "=" || s == "!!") {
-            Some(cutoff) => amount_tokens[..cutoff].join(" "),
-            None => amount_tokens.join(" "),
-        };
-
-        if raw_amount.trim().is_empty() {
-            self.amount = None;
-            return Ok(());
-        }
-
-        self.amount = match Amount::parse(&raw_amount, decimal_symbol) {
-            Ok(a) => Some(a),
-            Err(e) => return Err(e),
-        };
-
-        Ok(())
-    }
-
-    fn parse_assertion_amounts(
-        &mut self,
-        amount_tokens: &[&str],
-        decimal_symbol: char,
-    ) -> Result<(), ParseError> {
-        self.balance_assertion =
-            match Self::parse_balance_assertion_amount(amount_tokens, decimal_symbol) {
-                Ok(a) => a,
-                Err(e) => return Err(e),
-            };
-
-        self.cost_assertion = match Self::parse_price_amount(amount_tokens, decimal_symbol) {
-            Ok(price_opt) => {
-                // parsing succeeded, if there is a price, use that
-                if let Some(price) = price_opt {
-                    Some(price)
-                } else {
-                    // if no price, try to parse total cost
-                    match Self::parse_total_cost_amount(amount_tokens, decimal_symbol) {
-                        Ok(total_cost_opt) => total_cost_opt,
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-            Err(e) => return Err(e),
-        };
-
-        Ok(())
-    }
-
-    fn parse_balance_assertion_amount(
-        amount_tokens: &[&str],
-        decimal_symbol: char,
-    ) -> Result<Option<Amount>, ParseError> {
-        extract_amount(amount_tokens, decimal_symbol, "!", |&s| {
-            s == "!!" || s == "@" || s == "="
-        })
-    }
-
-    fn parse_price_amount(
-        amount_tokens: &[&str],
-        decimal_symbol: char,
-    ) -> Result<Option<Cost>, ParseError> {
-        match extract_amount(amount_tokens, decimal_symbol, "@", |&s| {
-            s == "!" || s == "!!" || s == "="
-        })? {
-            Some(a) => Ok(Some(Cost::UnitCost(a))),
-            None => Ok(None),
-        }
-    }
-
-    fn parse_total_cost_amount(
-        amount_tokens: &[&str],
-        decimal_symbol: char,
-    ) -> Result<Option<Cost>, ParseError> {
-        match extract_amount(amount_tokens, decimal_symbol, "=", |&s| {
-            s == "!" || s == "!!" || s == "@"
-        })? {
-            Some(a) => Ok(Some(Cost::TotalCost(a))),
-            None => Ok(None),
         }
     }
 
@@ -412,37 +247,5 @@ impl fmt::Display for Cost {
             Self::TotalCost(a) => write!(f, " == {}", a),
             Self::UnitCost(a) => write!(f, " @ {}", a),
         }
-    }
-}
-
-fn extract_amount<P>(
-    amount_tokens: &[&str],
-    decimal_symbol: char,
-    wanted_operator: &str,
-    unwanted_op_predicate: P,
-) -> Result<Option<Amount>, ParseError>
-where
-    P: FnMut(&&str) -> bool,
-{
-    // find the balance_assertion token
-    let mut iter = amount_tokens.iter();
-    match iter.position(|&s| s == wanted_operator) {
-        Some(i) => {
-            // trim unwanted tokens
-            let mut useful_tokens = &amount_tokens[i + 1..];
-
-            // find any other tokens that should be filtered out
-            if let Some(i) = useful_tokens.iter().position(unwanted_op_predicate) {
-                // trim unwanted tokens
-                useful_tokens = &useful_tokens[..i];
-            }
-
-            // parse the amount
-            match Amount::parse(useful_tokens.join(" ").as_str(), decimal_symbol) {
-                Ok(a) => Ok(Some(a)),
-                Err(e) => Err(e),
-            }
-        }
-        None => Ok(None),
     }
 }

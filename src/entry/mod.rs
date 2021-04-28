@@ -111,12 +111,12 @@ impl Entry {
                 continue;
             }
 
-            match Posting::parse(raw_posting, decimal_symbol, &accounts) {
+            match Posting::parse(raw_posting, decimal_symbol) {
                 Ok(p) => {
                     // push the posting
                     entry.postings.push(p);
                 }
-                Err(e) => return Err(e),
+                Err(e) => return Err(SilverfoxError::from(e)),
             }
         }
 
