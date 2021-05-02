@@ -6,6 +6,8 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
+pub mod builder;
+
 #[derive(Debug, PartialEq)]
 pub enum EntryStatus {
     /// `?`
