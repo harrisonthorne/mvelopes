@@ -77,30 +77,6 @@ impl fmt::Debug for Entry {
 }
 
 impl Entry {
-    pub fn new(
-        date: chrono::NaiveDate,
-        status: EntryStatus,
-        description: String,
-        payee: Option<String>,
-        postings: Vec<Posting>,
-        mut comment: Option<String>,
-    ) -> Self {
-        if let Some(c) = &comment {
-            if c.is_empty() {
-                comment = None
-            }
-        }
-
-        Self {
-            date,
-            status,
-            description,
-            payee,
-            comment,
-            postings,
-        }
-    }
-
     pub fn parse(
         chunk: &str,
         date_format: &str,

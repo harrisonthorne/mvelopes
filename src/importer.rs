@@ -1,4 +1,4 @@
-use crate::entry::{Entry, EntryStatus};
+use crate::entry::{builder::EntryBuilder, Entry, EntryStatus};
 use crate::errors::*;
 use crate::posting::{ClassicPosting, Posting};
 use crate::utils;
@@ -472,7 +472,9 @@ impl Rules {
                         postings.push(Posting::from(ClassicPosting::new("unknown", None, None, None)))
                     }
 
-                    Ok(Entry::new(date, status, description, payee, postings, comment))
+                    let entry = EntryBuilder::new().date(date).status(status).description(description).payee(payee).postings(postings).comment(comment).build()?;
+
+                    Ok(entry)
                 } else {
                     Err(SilverfoxError::from(ValidationError::default().set_message("an entry with only one posting was generated, and that posting had a blank amount. make sure you've included an `amount` rule")))
                 }
@@ -481,7 +483,9 @@ impl Rules {
                 Err(SilverfoxError::from(ValidationError::default().set_context(record.as_slice()).set_message("this record produced an entry without any postings. make sure you've included rules for `account` and `amount` so that postings can be generated")))
             },
             _ => {
-                Ok(Entry::new(date, status, description, payee, postings, comment))
+                let entry = EntryBuilder::new().date(date).status(status).description(description).payee(payee).postings(postings).comment(comment).build()?;
+
+                Ok(entry)
             }
         }
     }
@@ -625,20 +629,16 @@ test5
                 Some(Cost::UnitCost(price0)),
                 None,
             ));
-            let posting0_1 = Posting::from(ClassicPosting::new(
-                "income:unknown",
-                None,
-                None,
-                None,
-            ));
-            entry0 = Entry::new(
-                chrono::NaiveDate::from_ymd(2020, 10, 9),
-                EntryStatus::Cleared,
-                String::from("Test CSV Entry One"),
-                None,
-                vec![posting0_0, posting0_1],
-                Some(String::from("test comment")),
-            );
+            let posting0_1 = Posting::from(ClassicPosting::new("income:unknown", None, None, None));
+            entry0 = EntryBuilder::new()
+                .date(chrono::NaiveDate::from_ymd(2020, 10, 9))
+                .status(EntryStatus::Cleared)
+                .description(String::from("Test CSV Entry One"))
+                .postings(vec![posting0_0, posting0_1])
+                .comment(Some(String::from("test comment")))
+                .build()
+                .unwrap();
+
             entries.push(entry0);
         }
 
@@ -659,20 +659,16 @@ test5
                 Some(Cost::UnitCost(price1)),
                 None,
             ));
-            let posting1_1 = Posting::from(ClassicPosting::new(
-                "expenses:unknown",
-                None,
-                None,
-                None,
-            ));
-            entry1 = Entry::new(
-                chrono::NaiveDate::from_ymd(2020, 11, 12),
-                EntryStatus::Cleared,
-                String::from("Test CSV Entry Two"),
-                None,
-                vec![posting1_0, posting1_1],
-                Some(String::from("single condition test")),
-            );
+            let posting1_1 =
+                Posting::from(ClassicPosting::new("expenses:unknown", None, None, None));
+            entry1 = EntryBuilder::new()
+                .date(chrono::NaiveDate::from_ymd(2020, 11, 12))
+                .status(EntryStatus::Cleared)
+                .description(String::from("Test CSV Entry Two"))
+                .postings(vec![posting1_0, posting1_1])
+                .comment(Some(String::from("single condition test")))
+                .build()
+                .unwrap();
             entries.push(entry1);
         }
 
@@ -693,20 +689,17 @@ test5
                 Some(Cost::UnitCost(price2)),
                 None,
             ));
-            let posting2_1 = Posting::from(ClassicPosting::new(
-                "income:unknown",
-                None,
-                None,
-                None,
-            ));
-            entry2 = Entry::new(
-                chrono::NaiveDate::from_ymd(2020, 12, 13),
-                EntryStatus::Cleared,
-                String::from("Test CSV Entry Three"),
-                Some(String::from("Ferris the Crab")),
-                vec![posting2_0, posting2_1],
-                Some(String::from("multiple condition test")),
-            );
+            let posting2_1 = Posting::from(ClassicPosting::new("income:unknown", None, None, None));
+            entry2 = EntryBuilder::new()
+                .date(chrono::NaiveDate::from_ymd(2020, 12, 13))
+                .status(EntryStatus::Cleared)
+                .description(String::from("Test CSV Entry Three"))
+                .payee(Some(String::from("Ferris the Crab")))
+                .postings(vec![posting2_0, posting2_1])
+                .comment(Some(String::from("multiple condition test")))
+                .build()
+                .unwrap();
+
             entries.push(entry2);
         }
 
@@ -727,20 +720,18 @@ test5
                 Some(Cost::UnitCost(price3)),
                 None,
             ));
-            let posting3_1 = Posting::from(ClassicPosting::new(
-                "expenses:unknown",
-                None,
-                None,
-                None,
-            ));
-            entry3 = Entry::new(
-                chrono::NaiveDate::from_ymd(2020, 1, 2),
-                EntryStatus::Cleared,
-                String::from("Test CSV Entry Four"),
-                Some(String::from("Ferris the Crab")),
-                vec![posting3_0, posting3_1],
-                Some(String::from("multiple condition test")),
-            );
+            let posting3_1 =
+                Posting::from(ClassicPosting::new("expenses:unknown", None, None, None));
+            entry3 = EntryBuilder::new()
+                .date(chrono::NaiveDate::from_ymd(2020, 1, 2))
+                .status(EntryStatus::Cleared)
+                .description(String::from("Test CSV Entry Four"))
+                .payee(Some(String::from("Ferris the Crab")))
+                .postings(vec![posting3_0, posting3_1])
+                .comment(Some(String::from("multiple condition test")))
+                .build()
+                .unwrap();
+
             entries.push(entry3);
         }
 
@@ -761,20 +752,16 @@ test5
                 Some(Cost::UnitCost(price4)),
                 None,
             ));
-            let posting4_1 = Posting::from(ClassicPosting::new(
-                "income:unknown",
-                None,
-                None,
-                None,
-            ));
-            entry4 = Entry::new(
-                chrono::NaiveDate::from_ymd(2020, 2, 14),
-                EntryStatus::Cleared,
-                String::from("Test CSV Entry Five"),
-                None,
-                vec![posting4_0, posting4_1],
-                Some(String::from("comma decimal_symbol test")),
-            );
+            let posting4_1 = Posting::from(ClassicPosting::new("income:unknown", None, None, None));
+            entry4 = EntryBuilder::new()
+                .date(chrono::NaiveDate::from_ymd(2020, 2, 14))
+                .status(EntryStatus::Cleared)
+                .description(String::from("Test CSV Entry Five"))
+                .postings(vec![posting4_0, posting4_1])
+                .comment(Some(String::from("comma decimal_symbol test")))
+                .build()
+                .unwrap();
+
             entries.push(entry4);
         }
 
