@@ -6,7 +6,7 @@ use nom::{
     character::complete::{space0, space1},
     combinator::{map, opt},
     error::ErrorKind,
-    sequence::{pair, preceded},
+    sequence::preceded,
     IResult,
 };
 
