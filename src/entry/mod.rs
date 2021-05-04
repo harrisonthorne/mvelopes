@@ -25,9 +25,9 @@ impl EntryStatus {
 
     pub fn to_char(&self) -> char {
         match self {
-            EntryStatus::Reconciled => '*',
-            EntryStatus::Cleared => '~',
             EntryStatus::Pending => '?',
+            EntryStatus::Cleared => '~',
+            EntryStatus::Reconciled => '*',
         }
     }
 }
