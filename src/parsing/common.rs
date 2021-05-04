@@ -9,8 +9,9 @@ use nom::{
     IResult,
 };
 
-#[allow(clippy::result_unit_err)]
-pub fn eol_comment(line: &str) -> IResult<&str, &str> {
+use crate::errors::ParseError;
+
+pub fn eol_comment(line: &str) -> IResult<&str, &str, ParseError> {
     let comment_start = alt((tag("//"), tag(";")));
     map(
         pair(comment_start, preceded(space0, is_not("\r\n"))),
