@@ -305,7 +305,7 @@ use an envelope. We tell silverfox which envelope to use (and
 how much money) with this syntax:
 
 ```
-envelope <account> <envelope_name> <amount>
+envelope <envelope_name> <account> <amount>
 ```
 
 ## Fun facts
