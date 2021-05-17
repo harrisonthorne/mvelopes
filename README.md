@@ -319,21 +319,6 @@ learning as I go. Good experience so far :)
 
 ## Donate
 
-Asking for money isn't my thing, but if you're interested in
-helping to fund my education, rent, food, or even just a hot
-chocolate, you're welcome to send me Bitcoin or Ethereum:
-
-BTC
-
-```
-35yDrjaUwdFgLfJjboYxcY1mNLm1EvMLys
-```
-
-ETH
-
-```
-0x05d639861B8B7058ae237B41ef71ca2291A295e3
-```
-
-Thank you! Your interest in this project means the world for
-me.
+Your interest in this project means the world to me! If
+you're interested in helping me pay for my life (or even
+just a milkshake), let me know.
