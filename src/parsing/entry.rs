@@ -80,7 +80,7 @@ fn parse_status(input: &str) -> IResult<&str, EntryStatus, ParseError> {
 }
 
 fn parse_description(input: &str) -> IResult<&str, &str, ParseError> {
-    map(preceded(space0, is_not("\r\n[]")), |s: &str| s.trim())(input)
+    map(preceded(space0, is_not("\r\n[];/")), |s: &str| s.trim())(input)
 }
 
 fn parse_payee(input: &str) -> IResult<&str, Option<&str>, ParseError> {
@@ -132,7 +132,7 @@ mod tests {
         assert_eq!(input, "");
     }
 
-    const ENTRY_TWO: &str = "2019.08.02 ~ Groceries with cash back
+    const ENTRY_TWO: &str = "2019.08.02 ~ Groceries with cash back ; a semicolon comment
     assets:checking                -70
     assets:cash                     20
     expenses:groceries              50
