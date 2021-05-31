@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 pub mod builder;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum EntryStatus {
     /// `?`
     Pending,

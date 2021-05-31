@@ -2,7 +2,7 @@ use super::{Entry, EntryStatus};
 use crate::{errors::SilverfoxResult, errors::ValidationError, posting::Posting};
 use chrono::NaiveDate;
 
-#[derive(Default)]
+#[derive(Default, Debug, Eq, PartialEq)]
 pub struct EntryBuilder {
     date: Option<NaiveDate>,
     status: Option<EntryStatus>,
