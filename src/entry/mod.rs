@@ -1,3 +1,5 @@
+use nom::Finish;
+
 use crate::amount::{Amount, AmountPool};
 use crate::errors::*;
 use crate::posting::Posting;
@@ -77,114 +79,14 @@ impl fmt::Debug for Entry {
 }
 
 impl Entry {
+    #[deprecated = "the `silverfox::parsing` module provides tools for parsing silverfox data. this function uses that module internally, but scraps any leftover characters not part of the parsed entry"]
     pub fn parse(
         chunk: &str,
         date_format: &str,
         decimal_symbol: char,
-        accounts: &HashSet<&String>,
     ) -> Result<Self, SilverfoxError> {
-        let trimmed_chunk = chunk.trim();
-        if trimmed_chunk.is_empty() {
-            return Err(ParseError {
-                context: None,
-                message: Some("entry to parse is completely empty. this is an error with silverfox's programming. please report it!".to_string()),
-            }.into());
-        }
-
-        let mut lines = trimmed_chunk.lines();
-
-        // parse the header. parse_header returns the entry to start with
-        let mut entry = if let Some(l) = lines.next() {
-            Self::parse_header(l, date_format)?
-        } else {
-            let err = ParseError {
-                context: Some(chunk.to_string()),
-                message: Some("header couldn't be parsed because it doesn't exist. this is an error with silverfox's programming. please report it!".to_string())
-            };
-            return Err(SilverfoxError::from(err));
-        };
-
-        // parse postings
-        for raw_posting in lines {
-            // if blank, skip
-            if raw_posting.trim().is_empty() {
-                continue;
-            }
-
-            match Posting::parse(raw_posting, decimal_symbol) {
-                Ok(p) => {
-                    // push the posting
-                    entry.postings.push(p);
-                }
-                Err(e) => return Err(SilverfoxError::from(e)),
-            }
-        }
-
-        // validate this entry
-        entry.validate(chunk)?;
-
-        Ok(entry)
-    }
-
-    fn parse_header(header: &str, date_format: &str) -> Result<Self, ParseError> {
-        let clean_header = utils::remove_comments(header);
-        let header_tokens = clean_header.split_whitespace().collect::<Vec<&str>>();
-
-        if header_tokens.is_empty() {
-            return Err(ParseError {
-                message: Some("couldn't parse an entry header because it's blank.\nthis is an error with silverfox's programming; please report it!".to_string()),
-                context: None,
-            });
-        }
-
-        // parse date
-        let date = match chrono::NaiveDate::parse_from_str(header_tokens[0], date_format) {
-            Ok(d) => d,
-            _ => {
-                let message = format!(
-                    "couldn't parse date `{}` with format `{}`",
-                    header_tokens[0], date_format
-                );
-                return Err(ParseError {
-                    message: Some(message),
-                    context: Some(clean_header.to_string()),
-                });
-            }
-        };
-
-        // parse status
-        let status = header_tokens[1].parse::<EntryStatus>()?;
-
-        // parse description_and_payee
-        let description_and_payee: &str = &header_tokens[2..].join(" ");
-        let (description, payee) = if let Some(i) = description_and_payee.find('[') {
-            if let Some(j) = description_and_payee.rfind(']') {
-                // both brackets exist, so take everything before the opening bracket as the
-                // description and everything in the brackets as the payee
-                // yeah, this means anything after the closing bracket won't be included :/
-                let d = description_and_payee[..i].trim().to_string();
-                let p = description_and_payee[i + 1..j].trim().to_string();
-
-                (d, Some(p))
-            } else {
-                // only opening bracket exists, and that's kind of an issue
-                return Err(ParseError {
-                    message: Some("silverfox wanted to parse a payee in this header, but couldn't because it wasn't given a closing square bracket: ]".to_string()),
-                    context: Some(header.to_string()),
-                });
-            }
-        } else {
-            (description_and_payee.to_string(), None)
-        };
-
-        Ok(Entry {
-            payee,
-            description,
-            date,
-            status,
-            postings: Vec::new(),
-            comment: None,
-        })
+        let (_, entry) = crate::parsing::entry::parse_entry(date_format, decimal_symbol)(chunk).finish()?;
+        entry.build()
     }
 
     pub fn get_blank_amount(&self) -> Result<Option<Amount>, ProcessingError> {

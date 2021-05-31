@@ -167,7 +167,6 @@ impl Ledger {
             chunk,
             &self.date_format,
             self.decimal_symbol,
-            &self.accounts.keys().collect(),
         ) {
             Ok(entry) => self.add_entry(entry),
             Err(e) => Err(e),

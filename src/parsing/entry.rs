@@ -13,7 +13,7 @@ use nom::{
     IResult,
 };
 
-fn parse_entry<'a>(
+pub fn parse_entry<'a>(
     date_format: &'a str,
     decimal_symbol: char,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, EntryBuilder, ParseError> {
