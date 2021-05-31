@@ -26,7 +26,7 @@ pub fn parse_posting(
         let original_line = inp.to_string();
 
         // precede with whitespace, just in case
-        let (input, first_token) = preceded(space0, is_not(" \t\n\r"))(inp).map_err(
+        let (input, first_token) = preceded(space0, is_not(" \t\n\r/;"))(inp).map_err(
             |e: nom::Err<(&str, ErrorKind)>| {
                 e.map(|_| ParseError {
                     context: Some(original_line),
