@@ -1,17 +1,20 @@
-use crate::account::Account;
-use crate::amount::{Amount, AmountPool};
-use crate::entry::{builder::EntryBuilder, Entry};
-use crate::errors::*;
-use crate::importer::CsvImporter;
-use crate::posting::Posting;
-use crate::utils;
+use crate::{
+    account::Account,
+    amount::{Amount, AmountPool},
+    entry::Entry,
+    errors::*,
+    importer::CsvImporter,
+    posting::Posting,
+    utils,
+};
 use chrono::{Local, NaiveDate};
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::fs;
-use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Formatter},
+    fs,
+    io::prelude::*,
+    path::{Path, PathBuf},
+};
 
 mod register;
 use register::Register;
