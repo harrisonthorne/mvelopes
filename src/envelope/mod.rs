@@ -1,15 +1,12 @@
-use crate::amount::{Amount, AmountPool};
-use crate::entry::Entry;
-use crate::errors::ParseError;
-use crate::errors::ProcessingError;
-use crate::posting::{EnvelopePosting, Posting};
-use crate::utils;
-use chrono::prelude::*;
-use chrono::{Local, NaiveDate};
-use std::cmp::Ordering;
-use std::collections::HashSet;
-use std::fmt;
-use std::str::FromStr;
+use crate::{
+    amount::{Amount, AmountPool},
+    entry::Entry,
+    errors::{ParseError, ProcessingError},
+    posting::{EnvelopePosting, Posting},
+    utils,
+};
+use chrono::{prelude::*, Local, NaiveDate};
+use std::{cmp::Ordering, collections::HashSet, fmt, str::FromStr};
 
 #[derive(Debug)]
 pub struct Envelope {
