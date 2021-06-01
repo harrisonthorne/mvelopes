@@ -1,13 +1,17 @@
-use crate::amount::AmountPool;
-use crate::entry::Entry;
-use crate::envelope::{Envelope, EnvelopeType};
-use crate::errors::*;
-use crate::posting::Posting;
-use crate::utils;
+use crate::{
+    amount::AmountPool,
+    entry::Entry,
+    envelope::{Envelope, EnvelopeType},
+    errors::*,
+    posting::Posting,
+    utils,
+};
 use std::cmp::Ordering;
 
 pub struct Account {
     name: String,
+
+    // TODO: combine these into one
     expense_envelopes: Vec<Envelope>,
     goal_envelopes: Vec<Envelope>,
 
