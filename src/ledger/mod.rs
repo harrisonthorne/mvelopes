@@ -25,7 +25,7 @@ pub struct Ledger {
     entries: Vec<Entry>,
     date_format: String, // default = "%Y/%m/%d"
     accounts: HashMap<String, Account>,
-    default_currency: String,
+    default_currency: Option<String>,
     decimal_symbol: char,
 }
 
@@ -37,7 +37,7 @@ impl Ledger {
             date_format: String::from("%Y/%m/%d"),
             entries: Vec::new(),
             accounts: HashMap::new(),
-            default_currency: String::new(),
+            default_currency: None,
             decimal_symbol: '.',
         }
     }
@@ -131,7 +131,7 @@ impl Ledger {
                 context: None,
             })),
             Some(c) => {
-                self.default_currency = c.into();
+                self.default_currency = Some(c.into());
                 Ok(())
             }
         }
