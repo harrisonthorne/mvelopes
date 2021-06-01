@@ -21,11 +21,11 @@ mod register;
 use register::Register;
 
 pub struct Ledger {
-    file_path: PathBuf,
+    original_file_path: PathBuf,
     entries: Vec<Entry>,
     date_format: String, // default = "%Y/%m/%d"
     accounts: HashMap<String, Account>,
-    default_currency: Option<String>,
+    default_currency_symbol: Option<String>,
     decimal_symbol: char,
 }
 
@@ -33,11 +33,11 @@ impl Ledger {
     /// Returns a blank ledger, with default values for `date_format` and `decimal_symbol`.
     fn new() -> Self {
         Ledger {
-            file_path: PathBuf::new(),
+            original_file_path: PathBuf::new(),
             date_format: String::from("%Y/%m/%d"),
             entries: Vec::new(),
             accounts: HashMap::new(),
-            default_currency: None,
+            default_currency_symbol: None,
             decimal_symbol: '.',
         }
     }
@@ -45,7 +45,7 @@ impl Ledger {
     /// Returns a ledger parsed from a file at the `file_path`.
     pub fn from_file(file_path: &Path) -> Result<Self, SilverfoxError> {
         let mut ledger = Self::new();
-        ledger.file_path = PathBuf::from(file_path);
+        ledger.original_file_path = PathBuf::from(file_path);
 
         if let Err(e) = ledger.add_from_file(file_path) {
             Err(e)
@@ -131,7 +131,7 @@ impl Ledger {
                 context: None,
             })),
             Some(c) => {
-                self.default_currency = Some(c.into());
+                self.default_currency_symbol = Some(c.into());
                 Ok(())
             }
         }
@@ -191,9 +191,9 @@ impl Ledger {
     /// Appends the entry to the file of the Ledger, then internally adds the Entry itself to the
     /// Ledger.
     fn append_entry(&mut self, entry: Entry) -> Result<(), SilverfoxError> {
-        let mut file = match fs::OpenOptions::new().append(true).open(&self.file_path) {
+        let mut file = match fs::OpenOptions::new().append(true).open(&self.original_file_path) {
             Ok(f) => f,
-            Err(e) => return Err(SilverfoxError::file_error(&self.file_path, e)),
+            Err(e) => return Err(SilverfoxError::file_error(&self.original_file_path, e)),
         };
 
         if let Err(e) = write!(file, "\n{}", entry.as_parsable(&self.date_format)) {
