@@ -8,6 +8,8 @@ use crate::{
 };
 use std::cmp::Ordering;
 
+mod builder;
+
 pub struct Account {
     name: String,
 
