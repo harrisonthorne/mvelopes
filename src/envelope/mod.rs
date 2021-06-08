@@ -8,6 +8,8 @@ use crate::{
 use chrono::{prelude::*, Local, NaiveDate};
 use std::{cmp::Ordering, collections::HashSet, fmt, str::FromStr};
 
+pub mod builder;
+
 #[derive(Debug)]
 pub struct Envelope {
     name: String,
