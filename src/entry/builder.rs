@@ -55,6 +55,10 @@ impl EntryBuilder {
     }
 
     pub fn build(self, accounts: &HashSet<&String>) -> SilverfoxResult<Entry> {
+        for p in &self.postings {
+            p.validate(accounts)?
+        }
+
         Ok(Entry {
             date: self.date.ok_or_else(|| ValidationError {
                 context: None,

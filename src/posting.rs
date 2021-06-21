@@ -40,6 +40,18 @@ impl EnvelopePosting {
     pub fn get_amount(&self) -> &Amount {
         &self.amount
     }
+
+    pub fn validate(&self, account_names: &HashSet<&String>) -> Result<(), ValidationError> {
+        if !account_names.contains(&self.account_name) {
+            let message = format!(
+                "the account `{}` is not defined in your journal",
+                self.account_name
+            );
+            Err(ValidationError::default().set_message(&message))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Default for EnvelopePosting {
@@ -123,6 +135,13 @@ impl Posting {
 
     pub fn is_classic(&self) -> bool {
         matches!(self, Self::Classic(_))
+    }
+
+    pub fn validate(&self, account_names: &HashSet<&String>) -> Result<(), ValidationError> {
+        match self {
+            Self::Classic(c) => c.validate(account_names),
+            Self::Envelope(e) => e.validate(account_names),
+        }
     }
 }
 
