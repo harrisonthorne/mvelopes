@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::{Entry, EntryStatus};
 use crate::{errors::SilverfoxResult, errors::ValidationError, posting::Posting};
 use chrono::NaiveDate;
@@ -52,7 +54,7 @@ impl EntryBuilder {
         self
     }
 
-    pub fn build(self) -> SilverfoxResult<Entry> {
+    pub fn build(self, accounts: &HashSet<&String>) -> SilverfoxResult<Entry> {
         Ok(Entry {
             date: self.date.ok_or_else(|| ValidationError {
                 context: None,

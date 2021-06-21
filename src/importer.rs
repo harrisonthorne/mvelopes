@@ -472,7 +472,7 @@ impl Rules {
                         postings.push(Posting::from(ClassicPosting::new("unknown", None, None, None)))
                     }
 
-                    let entry = EntryBuilder::new().date(date).status(status).description(description).payee(payee).postings(postings).comment(comment).build()?;
+                    let entry = EntryBuilder::new().date(date).status(status).description(description).payee(payee).postings(postings).comment(comment).build(&account_set)?;
 
                     Ok(entry)
                 } else {
@@ -483,7 +483,7 @@ impl Rules {
                 Err(SilverfoxError::from(ValidationError::default().set_context(record.as_slice()).set_message("this record produced an entry without any postings. make sure you've included rules for `account` and `amount` so that postings can be generated")))
             },
             _ => {
-                let entry = EntryBuilder::new().date(date).status(status).description(description).payee(payee).postings(postings).comment(comment).build()?;
+                let entry = EntryBuilder::new().date(date).status(status).description(description).payee(payee).postings(postings).comment(comment).build(&account_set)?;
 
                 Ok(entry)
             }
@@ -615,6 +615,12 @@ test5
         // entry 0
         let entry0: Entry;
         {
+            let accounts = {
+                let mut h = HashSet::new();
+                h.insert(String::from("assets:test"));
+                h.insert(String::from("income:unknown"));
+                h
+            };
             let amount0 = Amount {
                 mag: 1.2,
                 symbol: Some(String::from("BTC")),
@@ -636,7 +642,7 @@ test5
                 .description(String::from("Test CSV Entry One"))
                 .postings(vec![posting0_0, posting0_1])
                 .comment(Some(String::from("test comment")))
-                .build()
+                .build(&accounts.iter().collect()) // how strange.
                 .unwrap();
 
             entries.push(entry0);
@@ -645,6 +651,12 @@ test5
         // entry 1
         let entry1: Entry;
         {
+            let accounts = {
+                let mut h = HashSet::new();
+                h.insert(String::from("assets:test"));
+                h.insert(String::from("expenses:unknown"));
+                h
+            };
             let amount1 = Amount {
                 mag: -3.4,
                 symbol: Some(String::from("BTC")),
@@ -667,7 +679,7 @@ test5
                 .description(String::from("Test CSV Entry Two"))
                 .postings(vec![posting1_0, posting1_1])
                 .comment(Some(String::from("single condition test")))
-                .build()
+                .build(&accounts.iter().collect())
                 .unwrap();
             entries.push(entry1);
         }
@@ -675,6 +687,12 @@ test5
         // entry 2
         let entry2: Entry;
         {
+            let accounts = {
+                let mut h = HashSet::new();
+                h.insert(String::from("assets:test"));
+                h.insert(String::from("income:unknown"));
+                h
+            };
             let amount2 = Amount {
                 mag: 5.6,
                 symbol: Some(String::from("BTC")),
@@ -697,7 +715,7 @@ test5
                 .payee(Some(String::from("Ferris the Crab")))
                 .postings(vec![posting2_0, posting2_1])
                 .comment(Some(String::from("multiple condition test")))
-                .build()
+                .build(&accounts.iter().collect())
                 .unwrap();
 
             entries.push(entry2);
@@ -706,6 +724,12 @@ test5
         // entry 3
         let entry3: Entry;
         {
+            let accounts = {
+                let mut h = HashSet::new();
+                h.insert(String::from("assets:test"));
+                h.insert(String::from("expenses:unknown"));
+                h
+            };
             let amount3 = Amount {
                 mag: -7.8,
                 symbol: Some(String::from("BTC")),
@@ -729,7 +753,7 @@ test5
                 .payee(Some(String::from("Ferris the Crab")))
                 .postings(vec![posting3_0, posting3_1])
                 .comment(Some(String::from("multiple condition test")))
-                .build()
+                .build(&accounts.iter().collect())
                 .unwrap();
 
             entries.push(entry3);
@@ -738,6 +762,12 @@ test5
         // entry 4
         let entry4: Entry;
         {
+            let accounts = {
+                let mut h = HashSet::new();
+                h.insert(String::from("assets:test"));
+                h.insert(String::from("income:unknown"));
+                h
+            };
             let amount4 = Amount {
                 mag: 9.1,
                 symbol: Some(String::from("BTC")),
@@ -759,7 +789,7 @@ test5
                 .description(String::from("Test CSV Entry Five"))
                 .postings(vec![posting4_0, posting4_1])
                 .comment(Some(String::from("comma decimal_symbol test")))
-                .build()
+                .build(&accounts.iter().collect())
                 .unwrap();
 
             entries.push(entry4);

@@ -84,9 +84,10 @@ impl Entry {
         chunk: &str,
         date_format: &str,
         decimal_symbol: char,
+        account_names: &HashSet<&String>,
     ) -> Result<Self, SilverfoxError> {
         let (_, entry) = crate::parsing::entry::parse_entry(date_format, decimal_symbol)(chunk).finish()?;
-        entry.build()
+        entry.build(account_names)
     }
 
     pub fn get_blank_amount(&self) -> Result<Option<Amount>, ProcessingError> {
